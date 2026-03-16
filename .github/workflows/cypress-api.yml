@@ -1,0 +1,59 @@
+##
+# @file        cypress-api.yml
+# @description GitHub Actions workflow that installs dependencies, runs the
+#              full Cypress API test suite, and uploads the Mochawesome HTML
+#              report as a downloadable artifact.
+# @purpose     Provides continuous integration for every push and pull request
+#              to main, ensuring API regressions are caught before merge.
+# @author      Bhuvesh Yadav
+# @github      https://github.com/bhuvesh75
+##
+
+name: Cypress API Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    # 15-minute timeout prevents runaway jobs from consuming CI minutes
+    timeout-minutes: 15
+
+    steps:
+      # Step 1 — Check out the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2 — Set up Node.js 20 with npm cache for faster installs
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Step 3 — Install project dependencies from the lockfile
+      - name: Install dependencies
+        run: npm install
+
+      # Step 4 — Execute the full Cypress API test suite in headless mode
+      - name: Run Cypress API tests
+        run: npm run cy:run
+        env:
+          CYPRESS_BASE_URL: https://reqres.in
+          # WHY: reqres.in requires x-api-key since 2025; tests skip gracefully
+          # when this secret is not set rather than failing with 403 errors.
+          CYPRESS_API_KEY: ${{ secrets.REQRES_API_KEY }}
+
+      # Step 5 — Upload the Mochawesome report as an artifact so it can be
+      #          downloaded from the workflow run page for review
+      - name: Upload Mochawesome report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-api-report
+          path: cypress/reports/
+          # Keep reports for 14 days to allow investigation of failures
+          retention-days: 14
